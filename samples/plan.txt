@@ -1,0 +1,4 @@
+2,INSERT INTO st (c1) VALUES ('test-x')
+1,INSERT INTO st (c1) VALUES ('test-y')
+1,COMMIT
+2,ROLLBACK
