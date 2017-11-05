@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/codegangsta/cli"
 	_ "github.com/go-sql-driver/mysql"
@@ -138,10 +139,11 @@ func mainAction(c *cli.Context) error {
 				fmt.Printf("%d: %s\n> ", n, sql)
 			default:
 				if checkRegexp(`(?i)^SELECT`, sql) {
-					queryTx(n, sql)
+					go queryTx(n, sql)
 				} else {
-					execTx(n, sql)
+					go execTx(n, sql)
 				}
+				time.Sleep(50 * time.Millisecond)
 				break FLABEL
 			}
 		}
