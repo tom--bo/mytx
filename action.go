@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,19 @@ func createTx() {
 		log.Fatalf("Filed to create tx: %s.", err.Error())
 	}
 	txs = append(txs, tmp)
+}
+
+func queryTx(n int, sql string) {
+	if len(txs) < n {
+		for i := len(txs); i < n; i++ {
+			createTx()
+		}
+	}
+	n -= 1
+
+	rows, err := txs[n].Queryx(sql)
+	checkError(err)
+	printRows(6, rows)
 }
 
 func execTx(n int, sql string) {
@@ -99,50 +113,69 @@ func mainAction(c *cli.Context) error {
 		planPath = c.Args().Get(0)
 	}
 	lines := readPlan(planPath)
-	checkSQL := "SELECT * FROM performance_schema.data_locks d INNER JOIN information_schema.innodb_trx i WHERE d.ENGINE_TRANSACTION_ID = i.trx_id"
+	// checkSQL := "SELECT * FROM performance_schema.data_locks d INNER JOIN information_schema.innodb_trx i WHERE d.ENGINE_TRANSACTION_ID = i.trx_id"
+	checkSQL := "SELECT PARTITION_NAME,INDEX_NAME,LOCK_TYPE,LOCK_MODE,LOCK_STATUS,LOCK_DATA,trx_id,trx_state,trx_started,trx_requested_lock_id,trx_query,trx_operation_state,trx_tables_in_use,trx_tables_locked,trx_lock_structs,trx_rows_locked,trx_rows_modified,trx_adaptive_hash_latched,trx_autocommit_non_locking FROM performance_schema.data_locks d INNER JOIN information_schema.innodb_trx i WHERE d.ENGINE_TRANSACTION_ID = i.trx_id;"
 
 	for _, line := range lines {
-		l := strings.Split(line, ",")
+		l := strings.SplitN(line, ",", 2)
 		n, err := strconv.Atoi(l[0])
 		checkError(err)
-		fmt.Printf("%s: %s\n> ", l[0], l[1])
+		sql := strings.Trim(l[1], " ")
+		fmt.Printf("%d: %s\n> ", n, sql)
 
+	FLABEL:
 		for stdin.Scan() {
 			t := stdin.Text()
-			if t == "s" {
+			switch t {
+			case "s":
 				fmt.Println("Skiped")
-				break
-			} else if t == "c" {
+				break FLABEL
+			case "c":
 				rows, err := db.Queryx(checkSQL)
 				checkError(err)
 
-				cols, err := rows.Columns()
-				checkError(err)
-				cnt := 1
-				for rows.Next() {
-					fmt.Printf("====================== row: %2d ====================== \n", cnt)
-					ret := make(map[string]interface{})
-					err = rows.MapScan(ret)
-					for _, cname := range cols {
-						fmt.Printf("%26v: ", cname) // 26
-						r := reflect.ValueOf(ret[cname])
-						// Sliceなら[]uint8にassersionでinterface{}を[]uint8に変換してさらにstringまで変換
-						if r.Kind() == reflect.Slice {
-							fmt.Println(string([]byte(ret[cname].([]uint8))))
-						} else {
-							fmt.Println(ret[cname])
-						}
-					}
-					cnt++
+				printRows(26, rows)
+				fmt.Printf("%d: %s\n> ", n, sql)
+			default:
+				if checkRegexp(`(?i)^SELECT`, sql) {
+					queryTx(n, sql)
+				} else {
+					execTx(n, sql)
 				}
-				fmt.Printf("\n%s: %s\n> ", l[0], l[1])
-			} else {
-				execTx(n, l[1])
-				break
+				break FLABEL
 			}
 		}
 	}
 	return nil
+}
+
+func printRows(width int, rows *sqlx.Rows) {
+	cols, err := rows.Columns()
+	checkError(err)
+
+	cnt := 1
+	colstr := fmt.Sprintf("%%%dv: ", width)
+	for rows.Next() {
+		fmt.Printf("====================== row: %2d ====================== \n", cnt)
+		ret := make(map[string]interface{})
+		err = rows.MapScan(ret)
+		for _, cname := range cols {
+			fmt.Printf(colstr, cname)
+			r := reflect.ValueOf(ret[cname])
+			// Sliceなら[]uint8にassersionでinterface{}を[]uint8に変換してさらにstringまで変換
+			if r.Kind() == reflect.Slice {
+				fmt.Println(string([]byte(ret[cname].([]uint8))))
+			} else {
+				fmt.Println(ret[cname])
+			}
+		}
+		cnt++
+	}
+	fmt.Println()
+}
+
+func checkRegexp(reg, str string) bool {
+	return regexp.MustCompile(reg).Match([]byte(str))
 }
 
 func checkError(err error) {
