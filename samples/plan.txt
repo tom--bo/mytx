@@ -1,5 +1,0 @@
-2,INSERT INTO t1 (c1, c2) VALUES (1100, 100)
-2,Select * from t1 where c1 = 1100
-1,INSERT INTO t1 (c1, c2) VALUES (1200, 200)
-1,ROLLBACK
-2,ROLLBACK
