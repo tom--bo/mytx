@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	// "database/sql"
 	"fmt"
 	"go/build"
 	"log"
@@ -107,7 +106,7 @@ func readPlan(planPath string) []string {
 
 func mainAction(c *cli.Context) error {
 	initDB()
-	stdin := bufio.NewScanner(os.Stdin)
+	stdin := bufio.NewReader(os.Stdin)
 
 	planPath := build.Default.GOPATH + "/src/github.com/tom--bo/mytx/samples/plan.txt"
 	if c.NArg() > 0 {
@@ -116,18 +115,21 @@ func mainAction(c *cli.Context) error {
 	lines := readPlan(planPath)
 	// checkSQL := "SELECT * FROM performance_schema.data_locks d INNER JOIN information_schema.innodb_trx i WHERE d.ENGINE_TRANSACTION_ID = i.trx_id"
 	checkSQL := "SELECT PARTITION_NAME,INDEX_NAME,LOCK_TYPE,LOCK_MODE,LOCK_STATUS,LOCK_DATA,trx_id,trx_state,trx_started,trx_requested_lock_id,trx_query,trx_operation_state,trx_tables_in_use,trx_tables_locked,trx_lock_structs,trx_rows_locked,trx_rows_modified,trx_adaptive_hash_latched,trx_autocommit_non_locking FROM performance_schema.data_locks d INNER JOIN information_schema.innodb_trx i WHERE d.ENGINE_TRANSACTION_ID = i.trx_id;"
-
 	for _, line := range lines {
 		l := strings.SplitN(line, ",", 2)
 		n, err := strconv.Atoi(l[0])
 		checkError(err)
 		sql := strings.Trim(l[1], " ")
 		fmt.Printf("%d: %s\n> ", n, sql)
-
 	FLABEL:
-		for stdin.Scan() {
-			t := stdin.Text()
+		for {
+			ln, _, err := stdin.ReadLine()
+			checkError(err)
+			t := strings.Trim(string(ln), " \t")
 			switch t {
+			case "h", "help":
+				showHelp()
+				fmt.Printf("%d: %s\n> ", n, sql)
 			case "s":
 				fmt.Println("Skiped")
 				break FLABEL
@@ -137,7 +139,7 @@ func mainAction(c *cli.Context) error {
 
 				printRows(26, rows)
 				fmt.Printf("%d: %s\n> ", n, sql)
-			default:
+			case "":
 				if checkRegexp(`(?i)^SELECT`, sql) {
 					go queryTx(n, sql)
 				} else {
@@ -145,6 +147,8 @@ func mainAction(c *cli.Context) error {
 				}
 				time.Sleep(50 * time.Millisecond)
 				break FLABEL
+			default:
+				fmt.Println("Only s, c, (enter), h(help) is supported.")
 			}
 		}
 	}
@@ -184,4 +188,15 @@ func checkError(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func showHelp() {
+	fmt.Println(`
+=== Help document ===
+	(enter): Execute the current SQL command
+	s: Skip, skip executing current command and continue next command
+	c: Show lock status. You can change the SQL to check the lock status
+	   by specifying .sql files with -c option for executing this scripts.
+	h: Show this help.
+	`)
 }
