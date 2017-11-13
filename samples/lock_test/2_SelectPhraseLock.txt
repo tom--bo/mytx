@@ -1,0 +1,4 @@
+1,SELECT * from t1 WHERE c2 = 50
+2,SELECT * from t1 WHERE c2 = 50
+1,COMMIT
+2,COMMIT
