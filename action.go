@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"go/build"
 	"log"
 	"os"
 	"reflect"
@@ -12,26 +11,44 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codegangsta/cli"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/urfave/cli"
 )
 
 var db *sqlx.DB
 var txs []*sqlx.Tx
 
-func initDB() {
-	user := "root"
-	passwd := "mysql"
-	dbname := "sample"
-	host := "localhost"
-	port := 3306
+func checkRegexp(reg, str string) bool {
+	return regexp.MustCompile(reg).Match([]byte(str))
+}
 
+func checkError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func showHelp() {
+	fmt.Println(`
+=== Help document ===
+	(enter): Execute the current SQL command
+	s: Skip, skip executing current command and continue next command
+	c: Show lock status. You can change the SQL to check the lock status
+	   by specifying .sql files with -c option for executing this scripts.
+	h: Show this help.
+	`)
+}
+
+func initDB(opt Options) {
 	var err error
-	db, err = sqlx.Open("mysql", user+":"+passwd+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	db, err = sqlx.Open("mysql", opt.user+":"+opt.passwd+"@tcp("+opt.host+":"+strconv.Itoa(opt.port)+")/"+opt.db+"?loc=Local&parseTime=true")
 	if err != nil {
 		log.Fatalf("Filed to connect to DB: %s.", err.Error())
 	}
+
+	// fmt.Println(opt.initSQLFilePath)
+	// fmt.Println(opt.checkSQLFilePath)
 }
 
 func createTx() {
@@ -105,16 +122,19 @@ func readPlan(planPath string) []string {
 }
 
 func mainAction(c *cli.Context) error {
-	initDB()
+	initDB(Opt)
+
 	stdin := bufio.NewReader(os.Stdin)
 
-	planPath := build.Default.GOPATH + "/src/github.com/tom--bo/mytx/samples/plan.txt"
+	var planPath string
 	if c.NArg() > 0 {
 		planPath = c.Args().Get(0)
+	} else {
+		log.Fatalf("Error: You need to specify a plan file")
 	}
 	lines := readPlan(planPath)
-	// checkSQL := "SELECT * FROM performance_schema.data_locks d INNER JOIN information_schema.innodb_trx i WHERE d.ENGINE_TRANSACTION_ID = i.trx_id"
-	checkSQL := "SELECT PARTITION_NAME,INDEX_NAME,LOCK_TYPE,LOCK_MODE,LOCK_STATUS,LOCK_DATA,trx_id,trx_state,trx_started,trx_requested_lock_id,trx_query,trx_operation_state,trx_tables_in_use,trx_tables_locked,trx_lock_structs,trx_rows_locked,trx_rows_modified,trx_adaptive_hash_latched,trx_autocommit_non_locking FROM performance_schema.data_locks d INNER JOIN information_schema.innodb_trx i WHERE d.ENGINE_TRANSACTION_ID = i.trx_id;"
+
+	checkSQL := "SELECT trx_id,PARTITION_NAME,INDEX_NAME,LOCK_TYPE,LOCK_MODE,LOCK_STATUS,LOCK_DATA,trx_state,trx_requested_lock_id,trx_query,trx_operation_state,trx_tables_in_use,trx_tables_locked,trx_lock_structs,trx_rows_locked,trx_rows_modified,trx_adaptive_hash_latched,trx_autocommit_non_locking FROM performance_schema.data_locks d LEFT JOIN information_schema.innodb_trx i ON d.ENGINE_TRANSACTION_ID = i.trx_id;"
 	for _, line := range lines {
 		l := strings.SplitN(line, ",", 2)
 		n, err := strconv.Atoi(l[0])
@@ -178,25 +198,4 @@ func printRows(width int, rows *sqlx.Rows) {
 		cnt++
 	}
 	fmt.Println()
-}
-
-func checkRegexp(reg, str string) bool {
-	return regexp.MustCompile(reg).Match([]byte(str))
-}
-
-func checkError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
-func showHelp() {
-	fmt.Println(`
-=== Help document ===
-	(enter): Execute the current SQL command
-	s: Skip, skip executing current command and continue next command
-	c: Show lock status. You can change the SQL to check the lock status
-	   by specifying .sql files with -c option for executing this scripts.
-	h: Show this help.
-	`)
 }
