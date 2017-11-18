@@ -9,7 +9,6 @@ import (
 )
 
 type Options struct {
-	initSQLFilePath  string
 	checkSQLFilePath string
 	host             string
 	user             string
@@ -22,12 +21,6 @@ var Opt Options
 var mytxPath = build.Default.GOPATH + "/src/github.com/tom--bo/mytx/"
 
 var GlobalFlags = []cli.Flag{
-	cli.StringFlag{
-		Name:        "initsql, i",
-		Value:       mytxPath + "samples/sql/init.sql",
-		Usage:       "",
-		Destination: &Opt.initSQLFilePath,
-	},
 	cli.StringFlag{
 		Name:        "checksql, c",
 		Value:       mytxPath + "samples/sql/check.sql",

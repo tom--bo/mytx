@@ -18,6 +18,7 @@ import (
 
 var db *sqlx.DB
 var txs []*sqlx.Tx
+var checkSQLs []string
 
 func checkRegexp(reg, str string) bool {
 	return regexp.MustCompile(reg).Match([]byte(str))
@@ -47,8 +48,7 @@ func initDB(opt Options) {
 		log.Fatalf("Filed to connect to DB: %s.", err.Error())
 	}
 
-	// fmt.Println(opt.initSQLFilePath)
-	// fmt.Println(opt.checkSQLFilePath)
+	checkSQLs = getLinesFromFile(opt.checkSQLFilePath)
 }
 
 func createTx() {
@@ -103,10 +103,10 @@ func execTx(n int, sql string) {
 	}
 }
 
-func readPlan(planPath string) []string {
+func getLinesFromFile(path string) []string {
 	var ret []string
 
-	fp, err := os.Open(planPath)
+	fp, err := os.Open(path)
 	checkError(err)
 	defer fp.Close()
 
@@ -132,9 +132,8 @@ func mainAction(c *cli.Context) error {
 	} else {
 		log.Fatalf("Error: You need to specify a plan file")
 	}
-	lines := readPlan(planPath)
+	lines := getLinesFromFile(planPath)
 
-	checkSQL := "SELECT trx_id,PARTITION_NAME,INDEX_NAME,LOCK_TYPE,LOCK_MODE,LOCK_STATUS,LOCK_DATA,trx_state,trx_requested_lock_id,trx_query,trx_operation_state,trx_tables_in_use,trx_tables_locked,trx_lock_structs,trx_rows_locked,trx_rows_modified,trx_adaptive_hash_latched,trx_autocommit_non_locking FROM performance_schema.data_locks d LEFT JOIN information_schema.innodb_trx i ON d.ENGINE_TRANSACTION_ID = i.trx_id;"
 	for _, line := range lines {
 		l := strings.SplitN(line, ",", 2)
 		n, err := strconv.Atoi(l[0])
@@ -146,20 +145,16 @@ func mainAction(c *cli.Context) error {
 			ln, _, err := stdin.ReadLine()
 			checkError(err)
 			t := strings.Trim(string(ln), " \t")
-			switch t {
-			case "h", "help":
+			if t == "h" || t == "help" {
 				showHelp()
 				fmt.Printf("%d: %s\n> ", n, sql)
-			case "s":
+			} else if t == "s" {
 				fmt.Println("Skiped")
 				break FLABEL
-			case "c":
-				rows, err := db.Queryx(checkSQL)
-				checkError(err)
-
-				printRows(26, rows)
+			} else if strings.HasPrefix(t, "c") {
+				execCheckSQL(t)
 				fmt.Printf("%d: %s\n> ", n, sql)
-			case "":
+			} else if t == "" {
 				if checkRegexp(`(?i)^SELECT`, sql) {
 					go queryTx(n, sql)
 				} else {
@@ -167,12 +162,32 @@ func mainAction(c *cli.Context) error {
 				}
 				time.Sleep(50 * time.Millisecond)
 				break FLABEL
-			default:
+			} else {
 				fmt.Println("Only s, c, (enter), h(help) is supported.")
 			}
 		}
 	}
 	return nil
+}
+
+func execCheckSQL(s string) {
+	n := 0
+	if s != "c" {
+		num := strings.SplitN(s, "c", 2)
+		var err error
+		n, err = strconv.Atoi(num[1])
+		if err != nil {
+			fmt.Println("You can specify c[n], [n] is only Integer.")
+		}
+	}
+
+	if n > len(checkSQLs)-1 || n < 0 {
+		fmt.Println("You can specify c[n], [n] is only Integer, and the value of [n] is the line of checkSQLFile specified by -c")
+	} else {
+		rows, err := db.Queryx(checkSQLs[n])
+		checkError(err)
+		printRows(26, rows)
+	}
 }
 
 func printRows(width int, rows *sqlx.Rows) {
