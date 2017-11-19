@@ -1,10 +1,42 @@
 # mytx
 
-
+This is a transaction tester for MySQL.
 
 ## Description
 
+[mytx](https://github.com/tom--bo/mytx) is motivated to simplify the process of checking lock status in MySQL.
+
 ## Usage
+
+$ mytx [options] PLAN-FILE.txt
+
+- PLAN-FILE.txt
+  - Split the transaction-number and SQL by ```,```
+  - like...
+```
+1,UPDATE t1 SET c2 = 70 WHERE id = 4
+2,SELECT * from t1 WHERE id = 4
+1,ROLLBACK
+2,COMMIT
+```
+
+- options
+  - ```-c```: to specify a file includes SQLs for internal ```c``` command
+  - ```-host(H)``` hostname of your MySQL
+  - ```-user(u)``` username of your MySQL
+  - ```-password(p)``` password of your MySQL
+  - ```-database(db or d)``` database name of your MySQL
+  - ```-port(P)``` port number(int) of your MySQL
+
+### To Use
+
+1. Prepare the transactions and arrange in the order you want to execute in some file(PLAN-FILE)
+1. If needed, you can prepare the SQLs to check any status in MySQL in another file(CHECK-SQLs)
+1. Execute with options you need
+1. For each line in the (PLAN-FILE), you can check the check lock status by commands in (CHECK-SQLs)
+  - s: skip the command
+  - c[n]: execute the [n]th check command
+  - (enter): execute the command
 
 ## Install
 
