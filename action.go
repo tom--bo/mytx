@@ -2,9 +2,12 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -42,10 +45,37 @@ func showHelp() {
 }
 
 func initDB(opt Options) {
-	var err error
-	db, err = sqlx.Open("mysql", opt.user+":"+opt.passwd+"@tcp("+opt.host+":"+strconv.Itoa(opt.port)+")/"+opt.db+"?loc=Local&parseTime=true")
-	if err != nil {
-		log.Fatalf("Filed to connect to DB: %s.", err.Error())
+	cmd := exec.Command("mysql", "-u", opt.user, "-h", opt.host, "-P", strconv.Itoa(opt.port), "-p"+opt.passwd, opt.db)
+
+	if opt.initSQLFilePath != "" {
+		readFile := opt.initSQLFilePath
+		input, err0 := ioutil.ReadFile(readFile)
+		if err0 != nil {
+			log.Fatalf("Failed to read an init SQL file: %s", err0.Error())
+			panic(err0)
+		}
+		stdin, _ := cmd.StdinPipe()
+		stdin.Write(input)
+		stdin.Close()
+	}
+
+	var stdErr, stdOut bytes.Buffer
+	cmd.Stdout = &stdOut
+	cmd.Stderr = &stdErr
+
+	err1 := cmd.Run()
+	if err1 != nil {
+		log.Fatalf("Failed to exec init SQL: %s.", err1.Error())
+		panic(err1)
+	}
+	fmt.Println("stdout -> " + stdOut.String())
+	fmt.Println("stderr -> " + stdErr.String())
+
+	var err2 error
+	db, err2 = sqlx.Open("mysql", opt.user+":"+opt.passwd+"@tcp("+opt.host+":"+strconv.Itoa(opt.port)+")/"+opt.db+"?loc=Local&parseTime=true")
+	if err2 != nil {
+		log.Fatalf("Filed to connect to DB: %s.", err2.Error())
+		panic(err2)
 	}
 
 	checkSQLs = getLinesFromFile(opt.checkSQLFilePath)

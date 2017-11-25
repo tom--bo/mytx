@@ -10,6 +10,7 @@ import (
 
 type Options struct {
 	checkSQLFilePath string
+	initSQLFilePath  string
 	host             string
 	user             string
 	passwd           string
@@ -28,16 +29,22 @@ var GlobalFlags = []cli.Flag{
 		Destination: &Opt.checkSQLFilePath,
 	},
 	cli.StringFlag{
+		Name:        "database, db, d",
+		Value:       "sample",
+		Usage:       "",
+		Destination: &Opt.db,
+	},
+	cli.StringFlag{
 		Name:        "host, H",
 		Value:       "localhost",
 		Usage:       "",
 		Destination: &Opt.host,
 	},
 	cli.StringFlag{
-		Name:        "user, u",
-		Value:       "mysql",
+		Name:        "init, i",
+		Value:       "",
 		Usage:       "",
-		Destination: &Opt.user,
+		Destination: &Opt.initSQLFilePath,
 	},
 	cli.StringFlag{
 		Name:        "pasword, p",
@@ -45,17 +52,17 @@ var GlobalFlags = []cli.Flag{
 		Usage:       "",
 		Destination: &Opt.passwd,
 	},
-	cli.StringFlag{
-		Name:        "database, db, d",
-		Value:       "sample",
-		Usage:       "",
-		Destination: &Opt.db,
-	},
 	cli.IntFlag{
 		Name:        "port, P",
 		Value:       3306,
 		Usage:       "",
 		Destination: &Opt.port,
+	},
+	cli.StringFlag{
+		Name:        "user, u",
+		Value:       "mysql",
+		Usage:       "",
+		Destination: &Opt.user,
 	},
 }
 
