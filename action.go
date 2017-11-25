@@ -27,12 +27,6 @@ func checkRegexp(reg, str string) bool {
 	return regexp.MustCompile(reg).Match([]byte(str))
 }
 
-func checkError(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-
 func showHelp() {
 	fmt.Println(`
 === Help document ===
@@ -98,7 +92,10 @@ func queryTx(n int, sql string) {
 	n -= 1
 
 	rows, err := txs[n].Queryx(sql)
-	checkError(err)
+	if err != nil {
+		log.Fatalf("Failed to query: %s", err.Error())
+		os.Exit(1)
+	}
 	printRows(6, rows)
 }
 
@@ -137,7 +134,10 @@ func getLinesFromFile(path string) []string {
 	var ret []string
 
 	fp, err := os.Open(path)
-	checkError(err)
+	if err != nil {
+		log.Fatalf("Failed to open the plan file: %s", err.Error())
+		os.Exit(1)
+	}
 	defer fp.Close()
 
 	scanner := bufio.NewScanner(fp)
@@ -167,13 +167,19 @@ func mainAction(c *cli.Context) error {
 	for _, line := range lines {
 		l := strings.SplitN(line, ",", 2)
 		n, err := strconv.Atoi(l[0])
-		checkError(err)
+		if err != nil {
+			log.Fatalf("Cannot specify not existing check-SQL: %s", err.Error())
+			os.Exit(1)
+		}
 		sql := strings.Trim(l[1], " ")
 		fmt.Printf("%d: %s\n> ", n, sql)
 	FLABEL:
 		for {
 			ln, _, err := stdin.ReadLine()
-			checkError(err)
+			if err != nil {
+				log.Fatalf("Failed to stdin.ReadLine: %s", err.Error())
+				os.Exit(1)
+			}
 			t := strings.Trim(string(ln), " \t")
 			if t == "h" || t == "help" {
 				showHelp()
@@ -215,14 +221,20 @@ func execCheckSQL(s string) {
 		fmt.Println("You can specify c[n], [n] is only Integer, and the value of [n] is the line of checkSQLFile specified by -c")
 	} else {
 		rows, err := db.Queryx(checkSQLs[n])
-		checkError(err)
+		if err != nil {
+			log.Fatalf("Failed to query: %s", err.Error())
+			os.Exit(1)
+		}
 		printRows(26, rows)
 	}
 }
 
 func printRows(width int, rows *sqlx.Rows) {
 	cols, err := rows.Columns()
-	checkError(err)
+	if err != nil {
+		log.Fatalf("Failed to get columns: %s", err.Error())
+		os.Exit(1)
+	}
 
 	cnt := 1
 	colstr := fmt.Sprintf("%%%dv: ", width)
