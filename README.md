@@ -4,14 +4,16 @@ This is a transaction tester for MySQL.
 
 ## Description
 
-[mytx](https://github.com/tom--bo/mytx) is motivated to simplify the process of checking lock status in MySQL.
+[mytx](https://github.com/tom--bo/mytx) is motivated to simplify the test process of checking lock status in MySQL.
 
 ## Usage
 
 $ mytx [options] PLAN-FILE.txt
 
 - PLAN-FILE.txt
-  - Split the transaction-number and SQL by ```,```
+  - Specify a transaction number and SQL command in one line
+    - Split the transaction-number and SQL by ```,```
+    - Need not ```BEGIN``` statement at the begining of commands.
   - like...
 ```
 1,UPDATE t1 SET c2 = 70 WHERE id = 4
@@ -23,6 +25,7 @@ $ mytx [options] PLAN-FILE.txt
 - options
   - ```-c```: to specify a file includes SQLs for internal ```c``` command
   - ```-host(H)``` hostname of your MySQL
+  - ```-init(i)``` to specify a .sql file to initialize your MySQL.
   - ```-user(u)``` username of your MySQL
   - ```-password(p)``` password of your MySQL
   - ```-database(db or d)``` database name of your MySQL
